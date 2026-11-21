@@ -1,0 +1,52 @@
+
+name: Docker ML Service
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t raisin-ml .
+
+      - name: Run Docker container
+        run: |
+          docker run -d -p 8000:8000 \
+            --name raisin-api raisin-ml
+
+      - name: Health check
+        run: |
+          curl --fail --retry 15 \
+            --retry-connrefused --retry-delay 2 \
+            http://localhost:8000/
+
+      - name: Test ML prediction
+        run: |
+          curl --fail -X POST \
+            http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{
+              "Area": 87524,
+              "MajorAxisLength": 442,
+              "MinorAxisLength": 253,
+              "Eccentricity": 0.82,
+              "ConvexArea": 90546,
+              "Extent": 0.759,
+              "Perimeter": 1184
+            }'
+
+      - name: Container logs
+        if: always()
+        run: docker logs raisin-api
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f raisin-api
